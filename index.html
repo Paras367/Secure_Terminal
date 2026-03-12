@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SECURE TERMINAL v2.0 | Restricted Access</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="age-gate">
+    <div class="age-verification" id="ageGate">
+        <div class="warning-container">
+            <i class="fas fa-exclamation-triangle warning-icon"></i>
+            <h1>RESTRICTED ACCESS</h1>
+            <div class="warning-box">
+                <p><i class="fas fa-shield-alt"></i> SECURE TERMINAL SYSTEM</p>
+                <p>This system contains sensitive information and is restricted to authorized personnel only.</p>
+                <p class="age-restriction">YOU MUST BE 18+ TO ENTER</p>
+            </div>
+            <div class="buttons">
+                <button class="btn btn-danger" onclick="denyAccess()">
+                    <i class="fas fa-times"></i> DENY ACCESS
+                </button>
+                <button class="btn btn-success" onclick="verifyAge()">
+                    <i class="fas fa-check"></i> I AM 18+ & AGREE
+                </button>
+            </div>
+            <div class="ads-banner top">
+                <div class="ad-placeholder">
+                    <span>ADVERTISEMENT</span>
+                    <small>CyberSecurity Solutions Inc.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+</body>
+</html>
