@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SECURE TERMINAL | Command Interface</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/terminal.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="terminal-container">
+        <!-- Header -->
+        <header class="terminal-header">
+            <div class="header-left">
+                <i class="fas fa-shield-alt"></i>
+                <span>SECURE TERMINAL v2.0</span>
+                <span class="status-indicator online">● ONLINE</span>
+            </div>
+            <div class="header-right">
+                <button onclick="showPortfolio()" class="nav-btn">
+                    <i class="fas fa-briefcase"></i> Portfolio
+                </button>
+                <button onclick="openAdmin()" class="nav-btn admin">
+                    <i class="fas fa-user-shield"></i> Admin
+                </button>
+                <button onclick="logout()" class="nav-btn danger">
+                    <i class="fas fa-sign-out-alt"></i> Exit
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Terminal -->
+        <div class="terminal-window" id="terminalWindow">
+            <div class="terminal-output" id="terminalOutput">
+                <div class="welcome-message">
+                    <pre>
+   _____               __  __             _            
+  / ____|             |  \/  |           | |           
+ | (___   ___  _ __   | \  / | __ _ _ __ | | _____ _ __ 
+  \___ \ / _ \| '_ \  | |\/| |/ _` | '_ \| |/ / _ \ '__|
+  ____) | (_) | | | | | |  | | (_| | | | |   <  __/ |   
+ |_____/ \___/|_| |_| |_|  |_|\__,_|_| |_|_|\_\___|_|   
+                                                        
+                    SECURE SYSTEM v2.0
+                    Type 'help' for commands
+                    </pre>
+                </div>
+            </div>
+            <div class="terminal-input-line">
+                <span class="prompt">user@secure-terminal:~$</span>
+                <input type="text" id="terminalInput" class="terminal-input" autocomplete="off" autofocus>
+            </div>
+        </div>
+
+        <!-- Sidebar Info -->
+        <aside class="sidebar">
+            <div class="system-info">
+                <h3><i class="fas fa-info-circle"></i> System Status</h3>
+                <div class="info-item">
+                    <span>Encryption:</span>
+                    <span class="secure">AES-256</span>
+                </div>
+                <div class="info-item">
+                    <span>Connection:</span>
+                    <span class="secure">Secure</span>
+                </div>
+                <div class="info-item">
+                    <span>IP Masking:</span>
+                    <span class="secure">Active</span>
+                </div>
+                <div class="info-item">
+                    <span>Firewall:</span>
+                    <span class="secure">Enabled</span>
+                </div>
+            </div>
+
+            <div class="ads-sidebar">
+                <div class="ad-box">
+                    <span class="ad-label">SPONSORED</span>
+                    <img src="https://via.placeholder.com/200x150/00ff00/000000?text=Security+Pro" alt="Ad">
+                    <p>Premium Security Suite</p>
+                </div>
+            </div>
+
+            <div class="quick-actions">
+                <h3><i class="fas fa-bolt"></i> Quick Actions</h3>
+                <button onclick="executeCommand('scan')"><i class="fas fa-search"></i> System Scan</button>
+                <button onclick="executeCommand('status')"><i class="fas fa-chart-line"></i> Status</button>
+                <button onclick="executeCommand('clear')"><i class="fas fa-trash"></i> Clear</button>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Portfolio Modal -->
+    <div id="portfolioModal" class="modal">
+        <div class="modal-content portfolio-modal">
+            <span class="close" onclick="closePortfolio()">&times;</span>
+            <h2><i class="fas fa-briefcase"></i> Portfolio Gallery</h2>
+            <div class="portfolio-grid" id="portfolioGrid">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+    </div>
+
+    <script src="js/security.js"></script>
+    <script src="js/terminal.js"></script>
+</body>
+</html>
