@@ -3,107 +3,1415 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SECURE TERMINAL | Command Interface</title>
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="css/terminal.css">
+    <title>NEXUS TERMINAL v2.0 | Command Interface</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=VT323&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --cyan: #00fff9;
+            --pink: #ff00a0;
+            --green: #00ff41;
+            --purple: #b700ff;
+            --yellow: #ffe000;
+            --orange: #ff6b00;
+            --dark: #030712;
+            --panel: rgba(0,255,249,0.03);
+            --border: rgba(0,255,249,0.15);
+            --border-bright: rgba(0,255,249,0.4);
+            --text: #a0f0ff;
+            --text-dim: rgba(160,240,255,0.5);
+            --glow-c: 0 0 20px rgba(0,255,249,0.4);
+            --glow-p: 0 0 20px rgba(255,0,160,0.4);
+            --glow-g: 0 0 20px rgba(0,255,65,0.4);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Share Tech Mono', monospace; background: var(--dark); color: var(--text); overflow: hidden; height: 100vh; }
+
+        /* Scanlines */
+        body::before {
+            content: '';
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,249,0.012) 2px, rgba(0,255,249,0.012) 4px);
+            pointer-events: none; z-index: 9999;
+        }
+
+        #matrixCanvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0; transition: opacity 1s; pointer-events: none; }
+        #matrixCanvas.active { opacity: 0.12; }
+
+        /* Main Layout */
+        .app { position: relative; z-index: 1; display: grid; grid-template-rows: 56px 1fr; grid-template-columns: 1fr 280px; height: 100vh; }
+
+        /* Header */
+        .header {
+            grid-column: 1 / -1;
+            background: rgba(3,7,18,0.95);
+            border-bottom: 1px solid var(--border-bright);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 1.5rem;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 30px rgba(0,255,249,0.1);
+        }
+        .header-brand { display: flex; align-items: center; gap: 1rem; }
+        .brand-name { font-family: 'Orbitron', sans-serif; font-size: 1rem; font-weight: 900; letter-spacing: 4px; color: var(--cyan); text-shadow: var(--glow-c); }
+        .brand-version { font-size: 0.7rem; color: var(--text-dim); border: 1px solid var(--border); padding: 0.2rem 0.5rem; border-radius: 2px; }
+        .status-pill { display: flex; align-items: center; gap: 0.4rem; font-size: 0.7rem; letter-spacing: 2px; color: var(--green); padding: 0.3rem 0.8rem; border: 1px solid rgba(0,255,65,0.3); border-radius: 20px; background: rgba(0,255,65,0.05); }
+        .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: blink 1s ease-in-out infinite; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+        .header-nav { display: flex; gap: 0.5rem; }
+        .nav-btn {
+            font-family: 'Orbitron', sans-serif; font-size: 0.65rem; letter-spacing: 2px; padding: 0.5rem 1rem;
+            background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+            cursor: pointer; transition: all 0.2s; border-radius: 2px; text-transform: uppercase;
+        }
+        .nav-btn:hover, .nav-btn.active { background: rgba(0,255,249,0.08); border-color: var(--cyan); color: var(--cyan); box-shadow: var(--glow-c); }
+        .nav-btn.pink:hover { background: rgba(255,0,160,0.08); border-color: var(--pink); color: var(--pink); box-shadow: var(--glow-p); }
+        .nav-btn.danger:hover { background: rgba(255,0,64,0.1); border-color: #ff0040; color: #ff0040; }
+
+        /* Clock in header */
+        .header-clock { font-family: 'VT323', monospace; font-size: 1.4rem; color: var(--cyan); text-shadow: var(--glow-c); letter-spacing: 3px; }
+
+        /* Terminal Area */
+        .terminal-area { display: flex; flex-direction: column; overflow: hidden; background: rgba(3,7,18,0.98); }
+        .terminal-tabs { display: flex; align-items: center; gap: 0; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.3); padding: 0 0.5rem; }
+        .tab {
+            font-family: 'Orbitron', sans-serif; font-size: 0.6rem; letter-spacing: 2px; padding: 0.6rem 1.2rem;
+            cursor: pointer; color: var(--text-dim); border-bottom: 2px solid transparent; transition: all 0.2s; text-transform: uppercase;
+        }
+        .tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+        .tab:hover { color: var(--text); }
+
+        .terminal-output {
+            flex: 1; overflow-y: auto; padding: 1.5rem;
+            scrollbar-width: thin; scrollbar-color: var(--cyan) transparent;
+        }
+        .terminal-output::-webkit-scrollbar { width: 4px; }
+        .terminal-output::-webkit-scrollbar-thumb { background: var(--cyan); border-radius: 2px; }
+
+        /* Boot sequence */
+        .boot-line { opacity: 0; animation: fadeIn 0.1s forwards; color: var(--green); font-size: 0.85rem; line-height: 1.8; }
+        @keyframes fadeIn { to { opacity: 1; } }
+        .boot-ok { color: var(--green); }
+        .boot-warn { color: var(--yellow); }
+        .boot-err { color: var(--pink); }
+
+        /* Command line */
+        .cmd-line { display: flex; align-items: flex-start; gap: 0.5rem; margin: 0.3rem 0; }
+        .cmd-prompt { color: var(--cyan); flex-shrink: 0; font-size: 0.9rem; text-shadow: var(--glow-c); }
+        .cmd-user { color: var(--green); }
+        .cmd-text { color: var(--yellow); }
+
+        .cmd-output {
+            margin: 0.3rem 0 0.8rem 1.5rem; padding: 0.8rem 1rem;
+            background: rgba(0,255,249,0.03); border-left: 2px solid var(--border-bright);
+            font-size: 0.85rem; line-height: 1.8; white-space: pre-wrap; word-break: break-all;
+        }
+        .cmd-output.err { border-left-color: var(--pink); color: var(--pink); background: rgba(255,0,160,0.03); }
+        .cmd-output.success { border-left-color: var(--green); }
+        .cmd-output.warn { border-left-color: var(--yellow); color: var(--yellow); background: rgba(255,224,0,0.03); }
+
+        /* Input Line */
+        .input-bar {
+            display: flex; align-items: center; gap: 0.8rem;
+            padding: 0.8rem 1.5rem; border-top: 1px solid var(--border);
+            background: rgba(0,0,0,0.5);
+        }
+        .input-prompt { color: var(--cyan); font-size: 0.9rem; white-space: nowrap; flex-shrink: 0; text-shadow: var(--glow-c); }
+        .terminal-input {
+            flex: 1; background: transparent; border: none; color: var(--text);
+            font-family: 'Share Tech Mono', monospace; font-size: 0.9rem;
+            outline: none; caret-color: var(--cyan);
+        }
+        .input-suggestions {
+            font-size: 0.7rem; color: var(--text-dim); flex-shrink: 0;
+            padding: 0.2rem 0.6rem; border: 1px solid var(--border); border-radius: 2px;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .input-suggestions:hover { color: var(--cyan); border-color: var(--cyan); }
+
+        /* Sidebar */
+        .sidebar {
+            background: rgba(3,7,18,0.95); border-left: 1px solid var(--border);
+            display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden;
+            scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+        }
+
+        /* Widget Sections */
+        .widget { border-bottom: 1px solid var(--border); padding: 1rem; }
+        .widget-title { font-family: 'Orbitron', sans-serif; font-size: 0.6rem; letter-spacing: 3px; color: var(--cyan); text-transform: uppercase; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.5rem; }
+        .widget-title i { font-size: 0.7rem; }
+
+        /* Clock Widget */
+        .big-clock { font-family: 'VT323', monospace; font-size: 2.8rem; color: var(--cyan); text-shadow: var(--glow-c); line-height: 1; letter-spacing: 4px; }
+        .big-date { font-size: 0.7rem; color: var(--text-dim); margin-top: 0.3rem; letter-spacing: 2px; }
+
+        /* System Stats */
+        .stat-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; font-size: 0.78rem; }
+        .stat-label { color: var(--text-dim); }
+        .stat-val { color: var(--cyan); }
+        .stat-bar { width: 100%; height: 3px; background: rgba(0,255,249,0.1); border-radius: 2px; margin-bottom: 0.8rem; }
+        .stat-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+        .fill-green { background: var(--green); box-shadow: 0 0 8px rgba(0,255,65,0.5); }
+        .fill-cyan { background: var(--cyan); box-shadow: 0 0 8px rgba(0,255,249,0.5); }
+        .fill-pink { background: var(--pink); box-shadow: 0 0 8px rgba(255,0,160,0.5); }
+        .fill-yellow { background: var(--yellow); box-shadow: 0 0 8px rgba(255,224,0,0.5); }
+
+        /* Network Widget */
+        .net-item { display: flex; justify-content: space-between; font-size: 0.75rem; padding: 0.3rem 0; border-bottom: 1px solid var(--border); }
+        .net-label { color: var(--text-dim); }
+        .net-val.secure { color: var(--green); }
+        .net-val.warn { color: var(--yellow); }
+
+        /* Threat Log */
+        .threat-item { font-size: 0.72rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border); display: flex; gap: 0.5rem; align-items: flex-start; }
+        .threat-time { color: var(--text-dim); flex-shrink: 0; }
+        .threat-msg { color: var(--yellow); }
+        .threat-msg.blocked { color: var(--green); }
+        .threat-msg.critical { color: var(--pink); }
+
+        /* Quick actions */
+        .action-btn {
+            width: 100%; margin-bottom: 0.4rem; padding: 0.6rem 1rem;
+            background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+            cursor: pointer; font-family: 'Share Tech Mono', monospace; font-size: 0.78rem;
+            text-align: left; border-radius: 2px; transition: all 0.2s;
+            display: flex; align-items: center; gap: 0.6rem;
+        }
+        .action-btn:hover { border-color: var(--cyan); color: var(--cyan); background: rgba(0,255,249,0.05); box-shadow: var(--glow-c); }
+        .action-btn i { width: 14px; text-align: center; }
+
+        /* Mini chart */
+        #netChart { width: 100%; height: 60px; }
+
+        /* Tab panels */
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* Hack Game */
+        .hack-container { padding: 1rem; }
+        .hack-title { font-family: 'Orbitron', sans-serif; font-size: 0.8rem; color: var(--pink); letter-spacing: 3px; margin-bottom: 1rem; text-shadow: var(--glow-p); }
+        .hack-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-bottom: 1rem; }
+        .hack-cell {
+            height: 36px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center;
+            font-size: 0.8rem; cursor: pointer; transition: all 0.15s; border-radius: 2px;
+            background: rgba(0,255,249,0.02);
+        }
+        .hack-cell:hover { background: rgba(0,255,249,0.1); border-color: var(--cyan); }
+        .hack-cell.selected { background: rgba(0,255,249,0.15); border-color: var(--cyan); color: var(--cyan); }
+        .hack-cell.correct { background: rgba(0,255,65,0.15); border-color: var(--green); color: var(--green); animation: pulse 0.3s; }
+        .hack-cell.wrong { background: rgba(255,0,160,0.15); border-color: var(--pink); color: var(--pink); }
+        .hack-info { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.8rem; }
+        .hack-attempts { color: var(--pink); }
+        .hack-target { color: var(--yellow); }
+        .hack-progress { height: 6px; background: rgba(0,255,249,0.1); border-radius: 3px; margin-bottom: 1rem; }
+        .hack-progress-fill { height: 100%; background: linear-gradient(90deg, var(--cyan), var(--pink)); border-radius: 3px; transition: width 0.3s; }
+        .hack-log { font-size: 0.75rem; color: var(--text-dim); line-height: 1.8; height: 80px; overflow-y: auto; }
+        .hack-btn {
+            font-family: 'Orbitron', sans-serif; font-size: 0.7rem; letter-spacing: 2px; padding: 0.6rem 1.5rem;
+            background: rgba(255,0,160,0.1); border: 1px solid var(--pink); color: var(--pink);
+            cursor: pointer; transition: all 0.2s; margin-top: 0.5rem;
+        }
+        .hack-btn:hover { background: var(--pink); color: #000; box-shadow: var(--glow-p); }
+
+        /* File System */
+        .fs-container { padding: 1rem; }
+        .fs-path { font-size: 0.8rem; color: var(--cyan); margin-bottom: 0.8rem; padding: 0.4rem 0.8rem; border: 1px solid var(--border); background: rgba(0,255,249,0.03); }
+        .fs-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0.6rem; cursor: pointer; transition: all 0.15s; border-radius: 2px; font-size: 0.82rem; }
+        .fs-item:hover { background: rgba(0,255,249,0.06); }
+        .fs-item.dir { color: var(--cyan); }
+        .fs-item.file { color: var(--text-dim); }
+        .fs-item.exec { color: var(--green); }
+        .fs-item i { width: 14px; text-align: center; }
+
+        /* Portfolio */
+        .portfolio-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; padding: 1rem; }
+        .port-card {
+            background: rgba(0,255,249,0.03); border: 1px solid var(--border); border-radius: 4px;
+            padding: 1rem; cursor: pointer; transition: all 0.3s; position: relative; overflow: hidden;
+        }
+        .port-card::before {
+            content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(0,255,249,0.05), transparent);
+            transform: rotate(45deg); transition: left 0.6s;
+        }
+        .port-card:hover { border-color: var(--cyan); box-shadow: var(--glow-c); transform: translateY(-3px); }
+        .port-card:hover::before { left: 150%; }
+        .port-icon { font-size: 2rem; margin-bottom: 0.8rem; }
+        .port-name { font-family: 'Orbitron', sans-serif; font-size: 0.7rem; color: var(--cyan); letter-spacing: 2px; margin-bottom: 0.5rem; }
+        .port-desc { font-size: 0.75rem; color: var(--text-dim); line-height: 1.5; }
+        .port-tag { display: inline-block; font-size: 0.6rem; padding: 0.2rem 0.5rem; margin-top: 0.5rem; border: 1px solid var(--border); border-radius: 2px; color: var(--yellow); }
+
+        /* Admin Modal */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-box {
+            background: rgba(3,7,18,0.98); border: 1px solid var(--pink); border-radius: 4px;
+            padding: 2.5rem; width: 420px; max-width: 90vw;
+            box-shadow: 0 0 60px rgba(255,0,160,0.3);
+            animation: modalIn 0.3s ease-out;
+        }
+        @keyframes modalIn { from { opacity:0; transform: scale(0.9) translateY(-20px); } to { opacity:1; transform: none; } }
+        .modal-icon { text-align: center; margin-bottom: 1.5rem; }
+        .modal-icon i { font-size: 3rem; color: var(--pink); text-shadow: var(--glow-p); }
+        .modal-title { font-family: 'Orbitron', sans-serif; text-align: center; letter-spacing: 4px; color: var(--pink); margin-bottom: 0.5rem; font-size: 1rem; }
+        .modal-sub { text-align: center; color: var(--text-dim); font-size: 0.75rem; letter-spacing: 2px; margin-bottom: 2rem; }
+        .modal-input-wrap { position: relative; margin-bottom: 1rem; }
+        .modal-input-wrap i { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--pink); }
+        .modal-input {
+            width: 100%; padding: 0.9rem 0.9rem 0.9rem 2.8rem;
+            background: rgba(255,0,160,0.05); border: 1px solid rgba(255,0,160,0.3); color: var(--text);
+            font-family: 'Share Tech Mono', monospace; font-size: 0.9rem; outline: none; border-radius: 2px; transition: all 0.2s;
+        }
+        .modal-input:focus { border-color: var(--pink); box-shadow: 0 0 15px rgba(255,0,160,0.2); }
+        .modal-submit {
+            width: 100%; padding: 1rem; background: rgba(255,0,160,0.1); border: 1px solid var(--pink);
+            color: var(--pink); font-family: 'Orbitron', sans-serif; font-size: 0.75rem; letter-spacing: 3px;
+            cursor: pointer; transition: all 0.3s; margin-top: 0.5rem;
+        }
+        .modal-submit:hover { background: var(--pink); color: #000; box-shadow: var(--glow-p); }
+        .modal-close { position: absolute; top: 1rem; right: 1rem; background: none; border: none; color: var(--text-dim); font-size: 1.2rem; cursor: pointer; }
+        .modal-close:hover { color: var(--pink); }
+        .modal-box-inner { position: relative; }
+
+        /* Music Player */
+        .music-player { padding: 1rem; }
+        .now-playing { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1rem; }
+        .track-art { width: 50px; height: 50px; background: linear-gradient(135deg, var(--purple), var(--pink)); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0; }
+        .track-art.spinning { animation: spin 4s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .track-info { flex: 1; min-width: 0; }
+        .track-name { font-size: 0.82rem; color: var(--cyan); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .track-artist { font-size: 0.72rem; color: var(--text-dim); }
+        .music-controls { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-bottom: 1rem; }
+        .music-btn { background: none; border: 1px solid var(--border); color: var(--text-dim); width: 34px; height: 34px; border-radius: 50%; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; }
+        .music-btn:hover { border-color: var(--cyan); color: var(--cyan); box-shadow: var(--glow-c); }
+        .music-btn.play { border-color: var(--cyan); color: var(--cyan); background: rgba(0,255,249,0.1); width: 44px; height: 44px; font-size: 1.1rem; }
+        .music-btn.play:hover { background: var(--cyan); color: #000; }
+        .music-progress { position: relative; margin-bottom: 0.5rem; }
+        .progress-bg { width: 100%; height: 3px; background: rgba(0,255,249,0.1); border-radius: 2px; cursor: pointer; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--cyan), var(--purple)); border-radius: 2px; transition: width 0.1s linear; }
+        .progress-times { display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--text-dim); margin-top: 0.4rem; }
+        .volume-row { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.5rem; }
+        .volume-row i { color: var(--text-dim); font-size: 0.8rem; }
+        .vol-slider { flex: 1; -webkit-appearance: none; height: 3px; background: rgba(0,255,249,0.2); border-radius: 2px; outline: none; cursor: pointer; }
+        .vol-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--cyan); cursor: pointer; }
+        .playlist { margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.8rem; }
+        .playlist-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0.4rem; border-radius: 2px; cursor: pointer; transition: all 0.15s; font-size: 0.75rem; }
+        .playlist-item:hover { background: rgba(0,255,249,0.06); }
+        .playlist-item.active { color: var(--cyan); }
+        .playlist-num { color: var(--text-dim); width: 16px; text-align: right; flex-shrink: 0; }
+        .playlist-name { flex: 1; color: var(--text); }
+        .playlist-item.active .playlist-name { color: var(--cyan); }
+        .playlist-dur { color: var(--text-dim); flex-shrink: 0; }
+
+        /* Spectrogram */
+        #spectroCanvas { width: 100%; height: 40px; margin: 0.5rem 0; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
+
+        /* Glitch animation */
+        @keyframes glitchAnim {
+            0%,100% { transform: translate(0); clip-path: none; }
+            5% { transform: translate(-3px, 1px); clip-path: polygon(0 20%, 100% 20%, 100% 30%, 0 30%); }
+            10% { transform: translate(3px, -1px); clip-path: polygon(0 60%, 100% 60%, 100% 70%, 0 70%); }
+            15% { transform: translate(0); clip-path: none; }
+        }
+
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .app { grid-template-columns: 1fr; }
+            .sidebar { display: none; }
+            .portfolio-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 500px) {
+            .portfolio-grid { grid-template-columns: 1fr; }
+        }
+
+        /* ASCII art colors */
+        .ascii-cyan { color: var(--cyan); }
+        .ascii-pink { color: var(--pink); }
+
+        /* Typing cursor */
+        .typing::after { content: '█'; animation: blink 0.7s step-end infinite; }
+
+        /* Autocomplete dropdown */
+        .autocomplete-dropdown {
+            position: absolute; bottom: 100%; left: 0; right: 0;
+            background: rgba(3,7,18,0.98); border: 1px solid var(--border-bright);
+            border-bottom: none; z-index: 100; display: none;
+        }
+        .autocomplete-item { padding: 0.4rem 1.5rem; font-size: 0.8rem; cursor: pointer; color: var(--text-dim); transition: all 0.15s; }
+        .autocomplete-item:hover, .autocomplete-item.highlighted { background: rgba(0,255,249,0.08); color: var(--cyan); }
+        .input-wrapper { position: relative; flex: 1; display: flex; align-items: center; }
+    </style>
 </head>
 <body>
-    <div class="terminal-container">
-        <!-- Header -->
-        <header class="terminal-header">
-            <div class="header-left">
-                <i class="fas fa-shield-alt"></i>
-                <span>SECURE TERMINAL v2.0</span>
-                <span class="status-indicator online">● ONLINE</span>
-            </div>
-            <div class="header-right">
-                <button onclick="showPortfolio()" class="nav-btn">
-                    <i class="fas fa-briefcase"></i> Portfolio
-                </button>
-                <button onclick="openAdmin()" class="nav-btn admin">
-                    <i class="fas fa-user-shield"></i> Admin
-                </button>
-                <button onclick="logout()" class="nav-btn danger">
-                    <i class="fas fa-sign-out-alt"></i> Exit
-                </button>
-            </div>
-        </header>
+<canvas id="matrixCanvas"></canvas>
 
-        <!-- Main Terminal -->
-        <div class="terminal-window" id="terminalWindow">
-            <div class="terminal-output" id="terminalOutput">
-                <div class="welcome-message">
-                    <pre>
-   _____               __  __             _            
-  / ____|             |  \/  |           | |           
- | (___   ___  _ __   | \  / | __ _ _ __ | | _____ _ __ 
-  \___ \ / _ \| '_ \  | |\/| |/ _` | '_ \| |/ / _ \ '__|
-  ____) | (_) | | | | | |  | | (_| | | | |   <  __/ |   
- |_____/ \___/|_| |_| |_|  |_|\__,_|_| |_|_|\_\___|_|   
-                                                        
-                    SECURE SYSTEM v2.0
-                    Type 'help' for commands
-                    </pre>
-                </div>
-            </div>
-            <div class="terminal-input-line">
-                <span class="prompt">user@secure-terminal:~$</span>
-                <input type="text" id="terminalInput" class="terminal-input" autocomplete="off" autofocus>
-            </div>
+<div class="app">
+    <!-- Header -->
+    <header class="header">
+        <div class="header-brand">
+            <div class="brand-name">NEXUS</div>
+            <div class="brand-version">v2.0</div>
+            <div class="status-pill"><span class="live-dot"></span> LIVE</div>
+        </div>
+        <div class="header-clock" id="headerClock">00:00:00</div>
+        <nav class="header-nav">
+            <button class="nav-btn active" onclick="switchView('terminal')"><i class="fas fa-terminal"></i> TERMINAL</button>
+            <button class="nav-btn" onclick="switchView('portfolio')"><i class="fas fa-th"></i> PORTFOLIO</button>
+            <button class="nav-btn" onclick="switchView('hack')"><i class="fas fa-bug"></i> HACK</button>
+            <button class="nav-btn pink" onclick="openAdmin()"><i class="fas fa-user-shield"></i> ADMIN</button>
+            <button class="nav-btn danger" onclick="doLogout()"><i class="fas fa-power-off"></i> EXIT</button>
+        </nav>
+    </header>
+
+    <!-- Main Terminal Panel -->
+    <div class="terminal-area" id="mainPanel">
+        <div class="terminal-tabs">
+            <span class="tab active" onclick="switchTab('terminal','main-output')">BASH</span>
+            <span class="tab" onclick="switchTab('filesystem','main-output')">EXPLORER</span>
+            <span class="tab" onclick="switchTab('music','main-output')">AUDIO</span>
         </div>
 
-        <!-- Sidebar Info -->
-        <aside class="sidebar">
-            <div class="system-info">
-                <h3><i class="fas fa-info-circle"></i> System Status</h3>
-                <div class="info-item">
-                    <span>Encryption:</span>
-                    <span class="secure">AES-256</span>
-                </div>
-                <div class="info-item">
-                    <span>Connection:</span>
-                    <span class="secure">Secure</span>
-                </div>
-                <div class="info-item">
-                    <span>IP Masking:</span>
-                    <span class="secure">Active</span>
-                </div>
-                <div class="info-item">
-                    <span>Firewall:</span>
-                    <span class="secure">Enabled</span>
-                </div>
-            </div>
+        <!-- Terminal Output -->
+        <div class="terminal-output" id="main-output">
+            <!-- Boot sequence injected by JS -->
+        </div>
 
-            <div class="ads-sidebar">
-                <div class="ad-box">
-                    <span class="ad-label">SPONSORED</span>
-                    <img src="https://via.placeholder.com/200x150/00ff00/000000?text=Security+Pro" alt="Ad">
-                    <p>Premium Security Suite</p>
-                </div>
+        <!-- Input -->
+        <div class="input-bar">
+            <span class="input-prompt" id="currentPrompt">root@nexus:~$</span>
+            <div class="input-wrapper">
+                <div class="autocomplete-dropdown" id="autocomplete"></div>
+                <input type="text" class="terminal-input" id="mainInput" autocomplete="off" spellcheck="false" autofocus>
             </div>
-
-            <div class="quick-actions">
-                <h3><i class="fas fa-bolt"></i> Quick Actions</h3>
-                <button onclick="executeCommand('scan')"><i class="fas fa-search"></i> System Scan</button>
-                <button onclick="executeCommand('status')"><i class="fas fa-chart-line"></i> Status</button>
-                <button onclick="executeCommand('clear')"><i class="fas fa-trash"></i> Clear</button>
-            </div>
-        </aside>
-    </div>
-
-    <!-- Portfolio Modal -->
-    <div id="portfolioModal" class="modal">
-        <div class="modal-content portfolio-modal">
-            <span class="close" onclick="closePortfolio()">&times;</span>
-            <h2><i class="fas fa-briefcase"></i> Portfolio Gallery</h2>
-            <div class="portfolio-grid" id="portfolioGrid">
-                <!-- Dynamic content -->
-            </div>
+            <span class="input-suggestions" onclick="executeCommand('help')">TAB: help</span>
         </div>
     </div>
 
-    <script src="js/security.js"></script>
-    <script src="js/terminal.js"></script>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <!-- Clock -->
+        <div class="widget">
+            <div class="widget-title"><i class="fas fa-clock"></i> SYSTEM CLOCK</div>
+            <div class="big-clock" id="bigClock">00:00:00</div>
+            <div class="big-date" id="bigDate">LOADING...</div>
+        </div>
+
+        <!-- System Stats -->
+        <div class="widget">
+            <div class="widget-title"><i class="fas fa-microchip"></i> SYSTEM METRICS</div>
+            <div class="stat-row"><span class="stat-label">CPU</span><span class="stat-val" id="cpuVal">0%</span></div>
+            <div class="stat-bar"><div class="stat-fill fill-cyan" id="cpuBar" style="width:0%"></div></div>
+            <div class="stat-row"><span class="stat-label">RAM</span><span class="stat-val" id="ramVal">0%</span></div>
+            <div class="stat-bar"><div class="stat-fill fill-green" id="ramBar" style="width:0%"></div></div>
+            <div class="stat-row"><span class="stat-label">NET</span><span class="stat-val" id="netVal">0 Mbps</span></div>
+            <div class="stat-bar"><div class="stat-fill fill-pink" id="netBar" style="width:0%"></div></div>
+            <div class="stat-row"><span class="stat-label">DISK</span><span class="stat-val" id="diskVal">0%</span></div>
+            <div class="stat-bar"><div class="stat-fill fill-yellow" id="diskBar" style="width:0%"></div></div>
+            <canvas id="netChart"></canvas>
+        </div>
+
+        <!-- Network -->
+        <div class="widget">
+            <div class="widget-title"><i class="fas fa-network-wired"></i> NETWORK STATUS</div>
+            <div class="net-item"><span class="net-label">ENCRYPTION</span><span class="net-val secure">AES-256 ✓</span></div>
+            <div class="net-item"><span class="net-label">IP MASK</span><span class="net-val secure">ACTIVE</span></div>
+            <div class="net-item"><span class="net-label">FIREWALL</span><span class="net-val secure">ENABLED</span></div>
+            <div class="net-item"><span class="net-label">VPN</span><span class="net-val secure">CONNECTED</span></div>
+            <div class="net-item"><span class="net-label">THREATS</span><span class="net-val secure" id="threatCount">0 BLOCKED</span></div>
+            <div class="net-item"><span class="net-label">PING</span><span class="net-val" id="pingVal">-- ms</span></div>
+        </div>
+
+        <!-- Threat Log -->
+        <div class="widget">
+            <div class="widget-title"><i class="fas fa-shield-virus"></i> THREAT LOG</div>
+            <div id="threatLog" style="max-height:120px;overflow-y:auto;"></div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="widget">
+            <div class="widget-title"><i class="fas fa-bolt"></i> QUICK ACTIONS</div>
+            <button class="action-btn" onclick="executeCommand('scan')"><i class="fas fa-search"></i> Run Security Scan</button>
+            <button class="action-btn" onclick="executeCommand('status')"><i class="fas fa-chart-bar"></i> System Status</button>
+            <button class="action-btn" onclick="executeCommand('matrix')"><i class="fas fa-code"></i> Toggle Matrix</button>
+            <button class="action-btn" onclick="executeCommand('whoami')"><i class="fas fa-user"></i> Identity Check</button>
+            <button class="action-btn" onclick="executeCommand('clear')"><i class="fas fa-trash"></i> Clear Terminal</button>
+        </div>
+    </aside>
+</div>
+
+<!-- Admin Modal -->
+<div class="modal-overlay" id="adminModal">
+    <div class="modal-box-inner" style="position:relative">
+        <div class="modal-box">
+            <div class="modal-icon"><i class="fas fa-lock"></i></div>
+            <div class="modal-title">ADMINISTRATOR ACCESS</div>
+            <div class="modal-sub">ENCRYPTED AUTHENTICATION REQUIRED</div>
+            <div class="modal-input-wrap">
+                <i class="fas fa-user"></i>
+                <input type="text" class="modal-input" id="adminUser" placeholder="USERNAME">
+            </div>
+            <div class="modal-input-wrap">
+                <i class="fas fa-key"></i>
+                <input type="password" class="modal-input" id="adminPass" placeholder="PASSWORD">
+            </div>
+            <button class="modal-submit" id="adminSubmit" onclick="doAdminLogin()">
+                <i class="fas fa-sign-in-alt"></i> AUTHENTICATE
+            </button>
+            <button class="modal-close" onclick="closeAdmin()"><i class="fas fa-times"></i></button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ===================== MATRIX RAIN =====================
+const canvas = document.getElementById('matrixCanvas');
+const ctx = canvas.getContext('2d');
+let matrixActive = false;
+
+function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+const matrixChars = 'ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝABCDEFGHIJKLMNOP0123456789'.split('');
+const matrixDrops = [];
+const fs = 13;
+let matrixCols = 0;
+
+function initMatrix() {
+    matrixCols = Math.floor(canvas.width / fs);
+    for (let i = 0; i < matrixCols; i++) matrixDrops[i] = Math.random() * -100;
+}
+initMatrix();
+
+function drawMatrix() {
+    if (!matrixActive) return;
+    ctx.fillStyle = 'rgba(3,7,18,0.06)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.font = fs + 'px Share Tech Mono';
+    matrixDrops.forEach((y, i) => {
+        const c = matrixChars[Math.floor(Math.random() * matrixChars.length)];
+        const r = Math.random();
+        ctx.fillStyle = r > 0.97 ? '#fff' : (r > 0.6 ? '#00fff9' : '#00ff41');
+        ctx.fillText(c, i * fs, y * fs);
+        if (y * fs > canvas.height && Math.random() > 0.975) matrixDrops[i] = 0;
+        matrixDrops[i] += 0.5;
+    });
+}
+setInterval(drawMatrix, 40);
+
+function toggleMatrix() {
+    matrixActive = !matrixActive;
+    canvas.classList.toggle('active', matrixActive);
+    if (!matrixActive) { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+    return matrixActive ? 'Matrix rain activated. Welcome to the grid.' : 'Matrix rain deactivated.';
+}
+
+// ===================== CLOCK =====================
+function updateClock() {
+    const now = new Date();
+    const t = now.toTimeString().split(' ')[0];
+    const days = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+    const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    const d = `${days[now.getDay()]} ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+    document.getElementById('bigClock').textContent = t;
+    document.getElementById('headerClock').textContent = t;
+    document.getElementById('bigDate').textContent = d;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ===================== SYSTEM STATS =====================
+let netHistory = new Array(30).fill(0);
+function updateStats() {
+    const cpu = Math.floor(Math.random() * 40 + 20);
+    const ram = Math.floor(Math.random() * 25 + 45);
+    const net = Math.floor(Math.random() * 200 + 50);
+    const disk = Math.floor(Math.random() * 10 + 60);
+    const ping = Math.floor(Math.random() * 30 + 8);
+
+    document.getElementById('cpuVal').textContent = cpu + '%';
+    document.getElementById('cpuBar').style.width = cpu + '%';
+    document.getElementById('ramVal').textContent = ram + '%';
+    document.getElementById('ramBar').style.width = ram + '%';
+    document.getElementById('netVal').textContent = net + ' Mb/s';
+    document.getElementById('netBar').style.width = (net/400*100) + '%';
+    document.getElementById('diskVal').textContent = disk + '%';
+    document.getElementById('diskBar').style.width = disk + '%';
+    document.getElementById('pingVal').textContent = ping + ' ms';
+
+    netHistory.push(net);
+    netHistory.shift();
+    drawNetChart();
+}
+
+function drawNetChart() {
+    const c = document.getElementById('netChart');
+    const x = c.getContext('2d');
+    const w = c.width = c.offsetWidth, h = c.height = 50;
+    x.clearRect(0, 0, w, h);
+    const max = Math.max(...netHistory, 1);
+    x.beginPath();
+    x.strokeStyle = '#00fff9';
+    x.lineWidth = 1.5;
+    x.shadowColor = '#00fff9';
+    x.shadowBlur = 8;
+    netHistory.forEach((v, i) => {
+        const px = (i / (netHistory.length - 1)) * w;
+        const py = h - (v / max) * h * 0.9;
+        i === 0 ? x.moveTo(px, py) : x.lineTo(px, py);
+    });
+    x.stroke();
+    x.lineTo(w, h); x.lineTo(0, h); x.closePath();
+    x.fillStyle = 'rgba(0,255,249,0.05)'; x.fill();
+}
+
+setInterval(updateStats, 1500);
+updateStats();
+
+// ===================== THREAT SIMULATION =====================
+let threatCount = 0;
+const threatMessages = [
+    ['Brute force attempt blocked', 'blocked'],
+    ['Port scan detected: 45.xxx.xx.1', 'warn'],
+    ['DDoS mitigation active', 'blocked'],
+    ['SQL injection attempt neutralized', 'blocked'],
+    ['Suspicious login from CN', 'warn'],
+    ['Malware signature detected', 'critical'],
+    ['Phishing domain blocked', 'blocked'],
+    ['Zero-day exploit attempt', 'critical'],
+];
+
+function addThreat() {
+    const [msg, type] = threatMessages[Math.floor(Math.random() * threatMessages.length)];
+    const log = document.getElementById('threatLog');
+    const now = new Date().toTimeString().split(' ')[0];
+    const item = document.createElement('div');
+    item.className = 'threat-item';
+    item.innerHTML = `<span class="threat-time">${now}</span><span class="threat-msg ${type}">${msg}</span>`;
+    log.insertBefore(item, log.firstChild);
+    if (log.children.length > 8) log.removeChild(log.lastChild);
+    threatCount++;
+    document.getElementById('threatCount').textContent = threatCount + ' BLOCKED';
+}
+
+setInterval(addThreat, 4000 + Math.random() * 4000);
+
+// ===================== FILE SYSTEM =====================
+const fileSystem = {
+    '~': {
+        type: 'dir',
+        children: {
+            'documents': { type: 'dir', children: {
+                'mission_brief.txt': { type: 'file', content: '=== CLASSIFIED ===\nOperation: NEXUS PROTOCOL\nStatus: ACTIVE\nClearance: LEVEL 5\n\nObjective: [REDACTED]\nAssets: [REDACTED]\nEvacuation code: [REDACTED]' },
+                'personnel.csv': { type: 'file', content: 'ID,NAME,CLEARANCE\n001,AGENT_X,L5\n002,CIPHER,L4\n003,PHANTOM,L5' },
+                'README.md': { type: 'file', content: '# Nexus Terminal Documentation\n\nThis terminal provides secure access to classified infrastructure.\n\nCommands: help\nAdmin: admin\nMatrix: matrix' },
+            }},
+            'scripts': { type: 'dir', children: {
+                'scan.sh': { type: 'exec', content: '#!/bin/bash\n# Security scanner\nnmap -sV -O target_ip\n# Results piped to IDS' },
+                'encrypt.py': { type: 'exec', content: '#!/usr/bin/env python3\n# AES-256 File Encryptor\nfrom Crypto.Cipher import AES\n...' },
+                'honeypot.js': { type: 'exec', content: '// Honeypot trap module\nconst trap = new HoneypotServer(port=9001);' },
+            }},
+            'logs': { type: 'dir', children: {
+                'access.log': { type: 'file', content: '2024-01-15 00:01:23 - AUTH SUCCESS - user:root\n2024-01-15 00:03:11 - CMD: scan\n2024-01-15 00:07:44 - THREAT BLOCKED: SQLi' },
+                'system.log': { type: 'file', content: 'Kernel 6.1.0 booted\nAll services started\nFirewall rules loaded: 2,847' },
+            }},
+            '.hidden': { type: 'dir', children: {
+                'keys.gpg': { type: 'file', content: '[ENCRYPTED CONTENT - GPG REQUIRED]' },
+                'vault.enc': { type: 'file', content: '[AES-256 ENCRYPTED - ACCESS DENIED]' },
+            }}
+        }
+    }
+};
+
+let currentPath = '~';
+let currentDir = fileSystem['~'];
+
+function resolvePath(path) {
+    if (path === '~') return { path: '~', dir: fileSystem['~'] };
+    const parts = path.replace('~/', '').split('/').filter(Boolean);
+    let dir = fileSystem['~'];
+    let p = '~';
+    for (const part of parts) {
+        if (!dir.children || !dir.children[part]) return null;
+        dir = dir.children[part];
+        p += '/' + part;
+    }
+    return { path: p, dir };
+}
+
+// ===================== TERMINAL COMMANDS =====================
+const commands = {
+    help: () => `
+<span style="color:var(--cyan)">╔══════════════════════════════════════════════╗
+║          NEXUS TERMINAL — COMMAND HELP        ║
+╚══════════════════════════════════════════════╝</span>
+
+<span style="color:var(--yellow)">SYSTEM</span>
+  help          Show this menu
+  clear         Clear terminal
+  whoami        User identity
+  date          Date & time
+  uptime        System uptime
+  uname         System info
+  status        Full system report
+
+<span style="color:var(--yellow)">FILE SYSTEM</span>
+  ls            List files
+  ls -a         List all (including hidden)
+  cd [dir]      Change directory
+  cat [file]    Read file
+  pwd           Print working directory
+  tree          Directory tree
+
+<span style="color:var(--yellow)">NETWORK & SECURITY</span>
+  scan          Security scan
+  ping [host]   Ping a host
+  netstat       Network connections
+  trace         Trace route
+  encrypt [txt] Encrypt text
+  firewall      Firewall status
+
+<span style="color:var(--yellow)">TOOLS</span>
+  matrix        Toggle matrix rain
+  portfolio     View portfolio
+  admin         Admin panel
+  hack          Launch hacking game
+  music         Open music player
+  weather       Current weather
+  calc [expr]   Calculator
+
+<span style="color:var(--yellow)">SHORTCUTS</span>
+  Ctrl+L        Clear terminal
+  ↑/↓           Command history
+  Tab           Autocomplete`,
+
+    clear: () => { document.getElementById('main-output').innerHTML = ''; return ''; },
+    pwd: () => currentPath,
+    ls: (args) => {
+        const showHidden = args.includes('-a');
+        const children = currentDir.children || {};
+        let out = '';
+        Object.entries(children).forEach(([name, item]) => {
+            if (!showHidden && name.startsWith('.')) return;
+            const color = item.type === 'dir' ? 'var(--cyan)' : (item.type === 'exec' ? 'var(--green)' : 'var(--text)');
+            const icon = item.type === 'dir' ? '📁' : (item.type === 'exec' ? '⚙️' : '📄');
+            const suffix = item.type === 'dir' ? '/' : '';
+            out += `<span style="color:${color}">${icon} ${name}${suffix}</span>   `;
+        });
+        return out || '(empty directory)';
+    },
+    cd: (args) => {
+        const target = args[0] || '~';
+        if (target === '..') {
+            if (currentPath === '~') return 'Already at root';
+            const parts = currentPath.split('/');
+            parts.pop();
+            currentPath = parts.join('/') || '~';
+            const r = resolvePath(currentPath);
+            if (r) { currentDir = r.dir; document.getElementById('currentPrompt').textContent = `root@nexus:${currentPath}$`; }
+            return '';
+        }
+        if (target === '~') { currentPath = '~'; currentDir = fileSystem['~']; document.getElementById('currentPrompt').textContent = 'root@nexus:~$'; return ''; }
+        if (!currentDir.children || !currentDir.children[target]) return `cd: no such directory: ${target}`;
+        if (currentDir.children[target].type !== 'dir') return `cd: not a directory: ${target}`;
+        currentPath = currentPath === '~' ? `~/${target}` : `${currentPath}/${target}`;
+        currentDir = currentDir.children[target];
+        document.getElementById('currentPrompt').textContent = `root@nexus:${currentPath}$`;
+        return '';
+    },
+    cat: (args) => {
+        if (!args[0]) return 'Usage: cat [filename]';
+        const file = currentDir.children?.[args[0]];
+        if (!file) return `cat: ${args[0]}: No such file`;
+        if (file.type === 'dir') return `cat: ${args[0]}: Is a directory`;
+        return file.content;
+    },
+    tree: () => {
+        function renderTree(dir, prefix = '') {
+            if (!dir.children) return '';
+            let out = '';
+            const entries = Object.entries(dir.children);
+            entries.forEach(([name, item], idx) => {
+                const isLast = idx === entries.length - 1;
+                const connector = isLast ? '└── ' : '├── ';
+                const color = item.type === 'dir' ? 'var(--cyan)' : (item.type === 'exec' ? 'var(--green)' : 'var(--text)');
+                out += `${prefix}${connector}<span style="color:${color}">${name}${item.type==='dir'?'/':''}</span>\n`;
+                if (item.type === 'dir') {
+                    out += renderTree(item, prefix + (isLast ? '    ' : '│   '));
+                }
+            });
+            return out;
+        }
+        return `<span style="color:var(--cyan)">${currentPath}</span>\n` + renderTree(currentDir);
+    },
+    whoami: () => `<span style="color:var(--green)">USER:</span>     root
+<span style="color:var(--green)">ROLE:</span>     System Administrator
+<span style="color:var(--green)">CLEARANCE:</span> LEVEL 5 — TOP SECRET
+<span style="color:var(--green)">SESSION:</span>  ${generateToken().substring(0,16).toUpperCase()}
+<span style="color:var(--green)">IP:</span>       [MASKED — TOR ACTIVE]
+<span style="color:var(--green)">LOCATION:</span> [CLASSIFIED]
+<span style="color:var(--green)">2FA:</span>      ACTIVE`,
+    date: () => {
+        const n = new Date();
+        return `${n.toDateString()}  ${n.toTimeString()}\nUNIX: ${Math.floor(n.getTime()/1000)}\nISO:  ${n.toISOString()}`;
+    },
+    uptime: () => {
+        const u = Math.floor(Math.random()*30+10);
+        return `System up ${u} days, ${Math.floor(Math.random()*24)} hours — Load: ${(Math.random()*2+0.5).toFixed(2)} ${(Math.random()*1.5+0.3).toFixed(2)} ${(Math.random()*1+0.1).toFixed(2)}`;
+    },
+    uname: () => `NEXUS OS 6.1.0-nexus #1 SMP ${new Date().toDateString()} x86_64 GNU/Linux`,
+    status: () => `
+<span style="color:var(--cyan)">═══ SYSTEM STATUS REPORT ═══</span>
+CPU Usage:    ${Math.floor(Math.random()*30+20)}% / 100%
+RAM Usage:    ${(Math.random()*4+2).toFixed(1)}GB / 32GB
+Swap:         ${(Math.random()*0.5).toFixed(1)}GB / 8GB
+Disk:         ${Math.floor(Math.random()*100+400)}GB / 2TB
+Net I/O:      ↑ ${Math.floor(Math.random()*100+50)}Mb/s  ↓ ${Math.floor(Math.random()*200+100)}Mb/s
+Processes:    ${Math.floor(Math.random()*50+200)} running
+Threats:      ${threatCount} blocked this session
+Encryption:   AES-256-GCM ACTIVE
+Firewall:     2,847 rules loaded`,
+
+    scan: () => {
+        addThreat();
+        return `<span style="color:var(--green)">Initiating deep security scan...</span>
+
+[████████████████████] 100%
+
+<span style="color:var(--green)">✓ Kernel integrity</span>         PASS
+<span style="color:var(--green)">✓ Memory checksum</span>          PASS  
+<span style="color:var(--green)">✓ Port audit</span>               PASS (2/65535 open)
+<span style="color:var(--green)">✓ Process anomaly detection</span> PASS
+<span style="color:var(--green)">✓ Rootkit scan</span>             PASS
+<span style="color:var(--green)">✓ File integrity</span>           PASS
+<span style="color:var(--yellow)">⚠ Suspicious connections</span>   2 blocked
+<span style="color:var(--green)">✓ Certificate verification</span>  PASS
+
+Scan complete. System SECURE.`;
+    },
+    ping: (args) => {
+        const host = args[0] || '8.8.8.8';
+        return Array.from({length:4}, (_,i) => `Reply from ${host}: bytes=64 time=${Math.floor(Math.random()*30+5)}ms TTL=116`).join('\n') + `\n\n4 packets transmitted, 4 received, 0% loss`;
+    },
+    netstat: () => `Proto  Local            Foreign          State
+TCP    0.0.0.0:443      *:*              LISTEN
+TCP    0.0.0.0:22       *:*              LISTEN
+TCP    127.0.0.1:3306   *:*              LISTEN
+TCP    [MASKED]:52xxx   8.8.8.8:443      ESTABLISHED
+TCP    [MASKED]:51xxx   [CLASSIFIED]:80  ESTABLISHED`,
+    trace: (args) => {
+        const h = args[0] || '1.1.1.1';
+        return Array.from({length:8}, (_,i) => ` ${i+1}  nexus-hop-${i+1}.secure  ${Math.floor(Math.random()*20+5)}ms`).join('\n');
+    },
+    encrypt: (args) => {
+        if (!args.length) return 'Usage: encrypt [text]';
+        const text = args.join(' ');
+        const encrypted = btoa(text).split('').map(c => Math.random()>0.5?c.toUpperCase():c.toLowerCase()).join('');
+        return `Input:     ${text}\nAlgorithm: AES-256-GCM\nEncrypted: ${encrypted}${generateToken().substring(0,8)}\nKey ID:    ${generateToken().substring(0,8).toUpperCase()}`;
+    },
+    firewall: () => `<span style="color:var(--green)">FIREWALL STATUS: ACTIVE</span>
+
+Rules loaded:  2,847
+Blocked today: ${threatCount + Math.floor(Math.random()*200+100)}
+Allowed:       ${Math.floor(Math.random()*5000+10000)}
+Last updated:  ${new Date().toLocaleString()}
+
+Active rules:
+  BLOCK  0.0.0.0/0 → port 23 (telnet)
+  BLOCK  0.0.0.0/0 → port 21 (ftp)
+  ALLOW  10.0.0.0/8 → port 22 (ssh)
+  ALLOW  0.0.0.0/0 → port 443 (https)`,
+
+    matrix: () => toggleMatrix(),
+    portfolio: () => { switchView('portfolio'); return 'Opening portfolio gallery...'; },
+    admin: () => { openAdmin(); return 'Authenticating to admin panel...'; },
+    hack: () => { switchView('hack'); return 'Launching hacking simulation...'; },
+    music: () => { switchTab('music', 'main-output'); return 'Opening audio interface...'; },
+    weather: () => `<span style="color:var(--cyan)">WEATHER — [LOCATION CLASSIFIED]</span>
+
+  ⛅  Partly Cloudy
+  🌡️  22°C / 72°F
+  💨  Wind: 14 km/h NW  
+  💧  Humidity: 58%
+  👁️  Visibility: 10km
+  
+<span style="color:var(--text-dim)">Data source: [REDACTED SATELLITE]</span>`,
+    calc: (args) => {
+        if (!args.length) return 'Usage: calc [expression] e.g. calc 2+2';
+        try {
+            const expr = args.join(' ').replace(/[^0-9+\-*/(). %]/g,'');
+            const result = Function('"use strict"; return (' + expr + ')')();
+            return `${args.join(' ')} = ${result}`;
+        } catch { return 'Invalid expression'; }
+    },
+    contact: () => `<span style="color:var(--cyan)">CONTACT INFORMATION</span>
+  
+  Email:    nexus@secure.terminal
+  Signal:   [ENCRYPTED CHANNEL]
+  PGP Key:  ${generateToken().substring(0,16).toUpperCase()}
+  
+  <span style="color:var(--text-dim)">All communications are end-to-end encrypted.</span>`,
+    exit: () => { setTimeout(doLogout, 1000); return 'Terminating session...'; },
+    logout: () => { setTimeout(doLogout, 1000); return 'Logging out...'; },
+};
+
+function generateToken() {
+    return Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+// ===================== TERMINAL ENGINE =====================
+const history = [];
+let historyIdx = -1;
+const output = document.getElementById('main-output');
+
+function printLine(html, cls = '') {
+    const d = document.createElement('div');
+    if (cls) d.className = cls;
+    d.innerHTML = html;
+    output.appendChild(d);
+    output.scrollTop = output.scrollHeight;
+    return d;
+}
+
+function executeCommand(rawCmd) {
+    if (!rawCmd.trim()) return;
+    history.unshift(rawCmd); historyIdx = -1;
+
+    printLine(`<span class="cmd-user">root@nexus</span><span style="color:var(--text-dim)">:</span><span style="color:var(--cyan)">${currentPath}</span><span style="color:var(--text-dim)">$</span> <span class="cmd-text">${rawCmd}</span>`);
+
+    const parts = rawCmd.trim().split(/\s+/);
+    const cmd = parts[0].toLowerCase();
+    const args = parts.slice(1);
+
+    let result;
+    if (commands[cmd]) {
+        result = commands[cmd](args);
+    } else {
+        result = `<span style="color:var(--pink)">command not found: ${cmd}</span>\nType <span style="color:var(--cyan)">help</span> for available commands.`;
+    }
+
+    if (result) {
+        const out = document.createElement('div');
+        out.className = 'cmd-output';
+        out.innerHTML = result;
+        output.appendChild(out);
+        output.scrollTop = output.scrollHeight;
+    }
+    document.getElementById('autocomplete').style.display = 'none';
+}
+
+// Input handling
+const input = document.getElementById('mainInput');
+input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { executeCommand(input.value); input.value = ''; }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); if (historyIdx < history.length-1) { historyIdx++; input.value = history[historyIdx]; } }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); if (historyIdx > 0) { historyIdx--; input.value = history[historyIdx]; } else { historyIdx = -1; input.value = ''; } }
+    else if (e.key === 'Tab') { e.preventDefault(); doAutocomplete(); }
+    else if (e.key === 'l' && e.ctrlKey) { e.preventDefault(); executeCommand('clear'); }
+});
+
+input.addEventListener('input', () => showAutocomplete(input.value));
+
+function showAutocomplete(val) {
+    const ac = document.getElementById('autocomplete');
+    if (!val.trim()) { ac.style.display = 'none'; return; }
+    const parts = val.trim().split(/\s+/);
+    if (parts.length > 1) { ac.style.display = 'none'; return; }
+    const q = parts[0].toLowerCase();
+    const matches = Object.keys(commands).filter(c => c.startsWith(q) && c !== q);
+    if (!matches.length) { ac.style.display = 'none'; return; }
+    ac.innerHTML = matches.slice(0,6).map(m => `<div class="autocomplete-item" onclick="input.value='${m}';autocomplete.style.display='none';input.focus();">${m}</div>`).join('');
+    ac.style.display = 'block';
+}
+
+function doAutocomplete() {
+    const q = input.value.toLowerCase().trim();
+    const matches = Object.keys(commands).filter(c => c.startsWith(q));
+    if (matches.length === 1) { input.value = matches[0]; document.getElementById('autocomplete').style.display = 'none'; }
+    else if (matches.length > 1) { executeCommand(''); input.value = ''; }
+}
+
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.autocomplete-item')) document.getElementById('autocomplete').style.display = 'none';
+    input.focus();
+});
+
+// Keyboard shortcut
+document.addEventListener('keydown', e => {
+    if (e.ctrlKey && e.key === 'l') { e.preventDefault(); executeCommand('clear'); }
+});
+
+// ===================== BOOT SEQUENCE =====================
+const bootLines = [
+    { text: 'NEXUS OS 6.1.0 booting...', delay: 100, class: '' },
+    { text: 'Loading kernel modules... [OK]', delay: 200, class: 'boot-ok' },
+    { text: 'Initializing AES-256 encryption engine... [OK]', delay: 350, class: 'boot-ok' },
+    { text: 'Starting firewall daemon... [OK]', delay: 500, class: 'boot-ok' },
+    { text: 'Loading 2,847 firewall rules... [OK]', delay: 650, class: 'boot-ok' },
+    { text: 'Connecting to VPN tunnel... [OK]', delay: 800, class: 'boot-ok' },
+    { text: 'IP masking: ACTIVE', delay: 950, class: 'boot-ok' },
+    { text: 'Loading IDS/IPS engine... [OK]', delay: 1100, class: 'boot-ok' },
+    { text: 'WARNING: External probe detected and blocked', delay: 1250, class: 'boot-warn' },
+    { text: 'Threat neutralized. Continuing...', delay: 1400, class: 'boot-ok' },
+    { text: 'Mounting encrypted volumes... [OK]', delay: 1550, class: 'boot-ok' },
+    { text: 'All systems nominal. Terminal ready.\n', delay: 1700, class: 'boot-ok' },
+    { text: '  ███╗   ██╗███████╗██╗  ██╗██╗   ██╗███████╗\n  ████╗  ██║██╔════╝╚██╗██╔╝██║   ██║██╔════╝\n  ██╔██╗ ██║█████╗   ╚███╔╝ ██║   ██║███████╗\n  ██║╚██╗██║██╔══╝   ██╔██╗ ██║   ██║╚════██║\n  ██║ ╚████║███████╗██╔╝ ██╗╚██████╔╝███████║\n  ╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝', delay: 1850, class: 'ascii-cyan', pre: true },
+    { text: '\nType <span style="color:var(--yellow)">help</span> for commands. Welcome, Administrator.\n', delay: 2100, class: '' },
+];
+
+bootLines.forEach(({ text, delay, class: cls, pre }) => {
+    setTimeout(() => {
+        const d = document.createElement(pre ? 'pre' : 'div');
+        d.className = `boot-line ${cls}`;
+        d.innerHTML = text;
+        d.style.animationDelay = '0s';
+        output.appendChild(d);
+        output.scrollTop = output.scrollHeight;
+    }, delay);
+});
+
+// ===================== VIEW SWITCHING =====================
+function switchView(view) {
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    if (view === 'terminal') {
+        document.getElementById('mainPanel').innerHTML = document.getElementById('mainPanel').innerHTML;
+        location.reload(); // Simple: just reload for terminal
+    } else if (view === 'portfolio') {
+        renderPortfolio();
+    } else if (view === 'hack') {
+        renderHack();
+    }
+}
+
+function switchTab(tab, outputId) {
+    if (tab === 'music') renderMusic();
+    else if (tab === 'filesystem') renderFilesystem();
+    else location.reload();
+}
+
+// ===================== PORTFOLIO =====================
+const portfolioItems = [
+    { icon: '🛡️', name: 'CIPHER VAULT', desc: 'Enterprise-grade password manager with zero-knowledge encryption and biometric auth.', tag: 'SECURITY', color: 'var(--cyan)' },
+    { icon: '🌐', name: 'PHANTOM PROXY', desc: 'Anonymous browsing network with distributed node infrastructure across 60+ countries.', tag: 'PRIVACY', color: 'var(--green)' },
+    { icon: '🔬', name: 'THREAT HUNTER', desc: 'AI-powered malware analysis sandbox with behavioral detection and reporting.', tag: 'AI / ML', color: 'var(--purple)' },
+    { icon: '💬', name: 'DARKWIRE CHAT', desc: 'Military-grade E2E encrypted messaging with ephemeral key generation.', tag: 'COMMS', color: 'var(--pink)' },
+    { icon: '📡', name: 'NETWATCH', desc: 'Real-time network traffic analyzer with deep packet inspection and anomaly detection.', tag: 'MONITORING', color: 'var(--yellow)' },
+    { icon: '🔑', name: 'KEYMASTER', desc: 'Hardware security key management system with tamper-evident audit trails.', tag: 'AUTH', color: 'var(--orange)' },
+    { icon: '🧬', name: 'BIOSIG AUTH', desc: 'Next-gen biometric authentication using neural pattern matching.', tag: 'BIOMETRICS', color: 'var(--cyan)' },
+    { icon: '☁️', name: 'CLOUDFORT', desc: 'Zero-trust cloud security platform with micro-segmentation and continuous verification.', tag: 'CLOUD', color: 'var(--green)' },
+    { icon: '⚡', name: 'FLASHSTRIKE', desc: 'DDoS mitigation system capable of absorbing 10Tbps+ volumetric attacks.', tag: 'INFRA', color: 'var(--pink)' },
+];
+
+function renderPortfolio() {
+    const panel = document.getElementById('mainPanel');
+    panel.innerHTML = `
+        <div style="padding:1.5rem;overflow-y:auto;height:calc(100% - 0px)">
+            <div style="font-family:'Orbitron',sans-serif;font-size:0.7rem;letter-spacing:4px;color:var(--cyan);margin-bottom:1.5rem;display:flex;align-items:center;gap:1rem;">
+                <span>◈ PORTFOLIO GALLERY</span>
+                <span style="flex:1;height:1px;background:var(--border);display:block"></span>
+                <span style="color:var(--text-dim)">${portfolioItems.length} PROJECTS</span>
+            </div>
+            <div class="portfolio-grid">
+                ${portfolioItems.map(item => `
+                    <div class="port-card">
+                        <div class="port-icon">${item.icon}</div>
+                        <div class="port-name" style="color:${item.color}">${item.name}</div>
+                        <div class="port-desc">${item.desc}</div>
+                        <span class="port-tag" style="border-color:${item.color};color:${item.color}">${item.tag}</span>
+                    </div>
+                `).join('')}
+            </div>
+        </div>`;
+    document.querySelectorAll('.nav-btn').forEach((b,i) => { b.classList.toggle('active', i===1); });
+}
+
+// ===================== HACKING MINI-GAME =====================
+let hackAttempts = 4, hackTarget = '', hackSolved = false;
+const hackWords = ['CIPHER','MATRIX','NEXUS','PROXY','VAULT','GHOST','STORM','BLADE','ROGUE','DELTA','SIGMA','OMEGA','ALPHA','BRAVO','DELTA'];
+
+function renderHack() {
+    const panel = document.getElementById('mainPanel');
+    hackTarget = hackWords[Math.floor(Math.random() * hackWords.length)];
+    hackAttempts = 4; hackSolved = false;
+
+    const chars = '0123456789ABCDEF/\\[]{}()<>|!@#$%^&*-+=~`'.split('');
+    const grid = Array.from({length: 64}, () => chars[Math.floor(Math.random() * chars.length)]);
+    // Hide the target word at random spots
+    const wordStart = Math.floor(Math.random() * 58);
+    for (let i = 0; i < hackTarget.length; i++) grid[wordStart + i] = hackTarget[i];
+
+    panel.innerHTML = `
+        <div class="hack-container" style="overflow-y:auto;height:100%">
+            <div class="hack-title">⚠ SECURITY BYPASS — TERMINAL HACK v3.2</div>
+            <div class="hack-info">
+                <span class="hack-target">TARGET: ██████ (${hackTarget.length} chars)</span>
+                <span class="hack-attempts">ATTEMPTS: <span id="hackAttempts">${hackAttempts}</span>/4</span>
+            </div>
+            <div class="hack-progress"><div class="hack-progress-fill" id="hackBar" style="width:100%"></div></div>
+            <p style="font-size:0.75rem;color:var(--text-dim);margin-bottom:1rem;">
+                Find the correct word in the memory grid. Words are 5-6 character sequences. Click adjacent characters to select.
+            </p>
+            <div class="hack-grid" id="hackGrid">
+                ${grid.map((c,i) => `<div class="hack-cell" data-idx="${i}" onclick="hackClick(${i},'${c}')">${c}</div>`).join('')}
+            </div>
+            <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:0.8rem;">
+                <span style="font-size:0.78rem;color:var(--text-dim)">Selected: <span id="hackSelected" style="color:var(--cyan);letter-spacing:3px">______</span></span>
+                <button class="hack-btn" onclick="hackSubmit()"><i class="fas fa-bolt"></i> SUBMIT CRACK</button>
+                <button class="hack-btn" style="border-color:var(--text-dim);color:var(--text-dim)" onclick="renderHack()"><i class="fas fa-redo"></i> RESET</button>
+            </div>
+            <div class="hack-log" id="hackLog">
+                <div style="color:var(--text-dim)">// Awaiting input sequence...</div>
+            </div>
+        </div>`;
+    document.querySelectorAll('.nav-btn').forEach((b,i) => { b.classList.toggle('active', i===2); });
+}
+
+let hackSelected = [];
+function hackClick(idx, char) {
+    if (hackSolved || hackAttempts <= 0) return;
+    const cell = document.querySelector(`[data-idx="${idx}"]`);
+    const selIdx = hackSelected.indexOf(idx);
+    if (selIdx >= 0) {
+        hackSelected.splice(selIdx, 1);
+        cell.classList.remove('selected');
+    } else if (hackSelected.length < hackTarget.length) {
+        hackSelected.push(idx);
+        cell.classList.add('selected');
+    }
+    const chars = hackSelected.map(i => document.querySelector(`[data-idx="${i}"]`).textContent).join('');
+    document.getElementById('hackSelected').textContent = chars.padEnd(hackTarget.length, '_');
+}
+
+function hackSubmit() {
+    if (!hackSelected.length || hackSolved) return;
+    const guess = hackSelected.map(i => document.querySelector(`[data-idx="${i}"]`).textContent).join('');
+    const log = document.getElementById('hackLog');
+
+    if (guess === hackTarget) {
+        hackSolved = true;
+        hackSelected.forEach(i => { const c = document.querySelector(`[data-idx="${i}"]`); c.classList.remove('selected'); c.classList.add('correct'); });
+        log.innerHTML += `<div style="color:var(--green)">✓ [${new Date().toLocaleTimeString()}] ACCESS GRANTED — Correct sequence: ${hackTarget}</div>`;
+        log.innerHTML += `<div style="color:var(--cyan)">   System compromised. All your base are belong to us.</div>`;
+    } else {
+        hackAttempts--;
+        hackSelected.forEach(i => { const c = document.querySelector(`[data-idx="${i}"]`); c.classList.remove('selected'); c.classList.add('wrong'); setTimeout(()=>c.classList.remove('wrong'),600); });
+        const likeness = [...guess].filter((c,i) => c === hackTarget[i]).length;
+        log.innerHTML += `<div style="color:var(--pink)">✗ [${new Date().toLocaleTimeString()}] WRONG: "${guess}" — Likeness: ${likeness}/${hackTarget.length}</div>`;
+        document.getElementById('hackAttempts').textContent = hackAttempts;
+        document.getElementById('hackBar').style.width = (hackAttempts/4*100) + '%';
+
+        if (hackAttempts <= 0) {
+            log.innerHTML += `<div style="color:var(--pink)">✗ LOCKOUT — Too many failed attempts. Terminal locked.</div>`;
+        }
+    }
+    hackSelected = [];
+    document.getElementById('hackSelected').textContent = '_'.repeat(hackTarget.length);
+    log.scrollTop = log.scrollHeight;
+}
+
+// ===================== MUSIC PLAYER =====================
+const tracks = [
+    { name: 'DIGITAL GHOST', artist: 'NEXUS AUDIO', duration: '4:23', freq: 440 },
+    { name: 'CIPHER WAVES', artist: 'DARK_MATRIX', duration: '3:51', freq: 528 },
+    { name: 'SYSTEM BREACH', artist: 'HACKERMAN', duration: '5:10', freq: 396 },
+    { name: 'ZERO DAY', artist: 'PHANTOM CODE', duration: '3:33', freq: 432 },
+    { name: 'BINARY DREAMS', artist: 'VOID_REC', duration: '6:02', freq: 417 },
+];
+let currentTrack = 0, isPlaying = false, audioCtx = null, oscillators = [], playInterval = null, playPos = 0;
+
+function renderMusic() {
+    const panel = document.getElementById('mainPanel');
+    panel.innerHTML = `
+        <div class="music-player" style="overflow-y:auto;height:100%;max-width:600px;margin:0 auto;padding-top:1.5rem">
+            <div style="font-family:'Orbitron',sans-serif;font-size:0.7rem;letter-spacing:4px;color:var(--cyan);margin-bottom:1.5rem;">◈ AUDIO INTERFACE</div>
+            <div class="now-playing">
+                <div class="track-art" id="trackArt">🎵</div>
+                <div class="track-info">
+                    <div class="track-name" id="trackName">${tracks[currentTrack].name}</div>
+                    <div class="track-artist" id="trackArtist">${tracks[currentTrack].artist}</div>
+                </div>
+            </div>
+            <canvas id="spectroCanvas"></canvas>
+            <div class="music-progress">
+                <div class="progress-bg" onclick="seekTrack(event, this)">
+                    <div class="progress-fill" id="musicProgress" style="width:0%"></div>
+                </div>
+                <div class="progress-times"><span id="musicCurr">0:00</span><span>${tracks[currentTrack].duration}</span></div>
+            </div>
+            <div class="music-controls">
+                <button class="music-btn" onclick="prevTrack()"><i class="fas fa-step-backward"></i></button>
+                <button class="music-btn" onclick="rewindTrack()"><i class="fas fa-backward"></i></button>
+                <button class="music-btn play" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i></button>
+                <button class="music-btn" onclick="forwardTrack()"><i class="fas fa-forward"></i></button>
+                <button class="music-btn" onclick="nextTrack()"><i class="fas fa-step-forward"></i></button>
+            </div>
+            <div class="volume-row">
+                <i class="fas fa-volume-down"></i>
+                <input type="range" class="vol-slider" id="volSlider" min="0" max="100" value="70" oninput="setVolume(this.value)">
+                <i class="fas fa-volume-up"></i>
+            </div>
+            <div class="playlist">
+                <div style="font-family:'Orbitron',sans-serif;font-size:0.6rem;letter-spacing:3px;color:var(--text-dim);margin-bottom:0.8rem;">PLAYLIST</div>
+                ${tracks.map((t,i) => `
+                    <div class="playlist-item ${i===currentTrack?'active':''}" onclick="loadTrack(${i})">
+                        <span class="playlist-num">${i===currentTrack?'▶':i+1}</span>
+                        <span class="playlist-name">${t.name}</span>
+                        <span style="color:var(--text-dim);font-size:0.7rem;">${t.artist}</span>
+                        <span class="playlist-dur">${t.duration}</span>
+                    </div>`).join('')}
+            </div>
+        </div>`;
+    drawSpectro();
+}
+
+let spectroAnim;
+function drawSpectro() {
+    const c = document.getElementById('spectroCanvas');
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    c.width = c.offsetWidth; c.height = 50;
+    function frame() {
+        if (!document.getElementById('spectroCanvas')) { cancelAnimationFrame(spectroAnim); return; }
+        ctx.fillStyle = 'rgba(3,7,18,0.3)';
+        ctx.fillRect(0, 0, c.width, c.height);
+        const bars = 40;
+        for (let i = 0; i < bars; i++) {
+            const h = isPlaying ? Math.random() * 40 + 5 : 3;
+            const x = (i / bars) * c.width;
+            const grad = ctx.createLinearGradient(0, c.height, 0, c.height - h);
+            grad.addColorStop(0, 'var(--cyan)');
+            grad.addColorStop(1, 'var(--purple)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(x, c.height - h, (c.width/bars) - 2, h);
+        }
+        spectroAnim = requestAnimationFrame(frame);
+    }
+    frame();
+}
+
+let trackDuration = 0, totalSecs = 0;
+function loadTrack(idx) {
+    currentTrack = idx;
+    stopAudio();
+    const [m, s] = tracks[idx].duration.split(':').map(Number);
+    totalSecs = m * 60 + s;
+    playPos = 0;
+    document.getElementById('trackName').textContent = tracks[idx].name;
+    document.getElementById('trackArtist').textContent = tracks[idx].artist;
+    document.querySelectorAll('.playlist-item').forEach((el, i) => {
+        el.classList.toggle('active', i === idx);
+        el.querySelector('.playlist-num').textContent = i === idx ? '▶' : i + 1;
+    });
+    if (isPlaying) { isPlaying = false; startPlay(); }
+}
+
+function togglePlay() {
+    if (isPlaying) { stopAudio(); } else { startPlay(); }
+}
+
+function startPlay() {
+    isPlaying = true;
+    document.getElementById('playBtn').innerHTML = '<i class="fas fa-pause"></i>';
+    document.getElementById('trackArt').classList.add('spinning');
+    // Web Audio tone
+    try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(tracks[currentTrack].freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); oscillators = [osc];
+        const vol = document.getElementById('volSlider');
+        if (vol) gain.gain.value = vol.value / 2000;
+    } catch(e) {}
+    const [m, s] = tracks[currentTrack].duration.split(':').map(Number);
+    totalSecs = m * 60 + s;
+    playInterval = setInterval(() => {
+        playPos++;
+        if (playPos >= totalSecs) { nextTrack(); return; }
+        const pct = (playPos / totalSecs) * 100;
+        const el = document.getElementById('musicProgress');
+        const tc = document.getElementById('musicCurr');
+        if (el) el.style.width = pct + '%';
+        if (tc) tc.textContent = `${Math.floor(playPos/60)}:${String(playPos%60).padStart(2,'0')}`;
+    }, 1000);
+}
+
+function stopAudio() {
+    isPlaying = false;
+    oscillators.forEach(o => { try { o.stop(); } catch(e){} });
+    oscillators = [];
+    if (audioCtx) { audioCtx.close(); audioCtx = null; }
+    clearInterval(playInterval);
+    const pb = document.getElementById('playBtn');
+    const ta = document.getElementById('trackArt');
+    if (pb) pb.innerHTML = '<i class="fas fa-play"></i>';
+    if (ta) ta.classList.remove('spinning');
+}
+
+function nextTrack() { loadTrack((currentTrack + 1) % tracks.length); if (!isPlaying) startPlay(); }
+function prevTrack() { loadTrack((currentTrack - 1 + tracks.length) % tracks.length); if (!isPlaying) startPlay(); }
+function rewindTrack() { playPos = Math.max(0, playPos - 10); }
+function forwardTrack() { playPos = Math.min(totalSecs - 1, playPos + 10); }
+function setVolume(v) { if (audioCtx && oscillators.length) { /* adjust gain */ } }
+
+function renderFilesystem() {
+    const panel = document.getElementById('mainPanel');
+    panel.innerHTML = `
+        <div class="fs-container" style="overflow-y:auto;height:100%">
+            <div style="font-family:'Orbitron',sans-serif;font-size:0.7rem;letter-spacing:4px;color:var(--cyan);margin-bottom:1rem;">◈ FILE EXPLORER</div>
+            <div class="fs-path" id="fsPath">${currentPath}</div>
+            <div id="fsList"></div>
+        </div>`;
+    renderFSDir();
+}
+
+function renderFSDir() {
+    const list = document.getElementById('fsList');
+    if (!list) return;
+    const children = currentDir.children || {};
+    list.innerHTML = '';
+    if (currentPath !== '~') {
+        const up = document.createElement('div');
+        up.className = 'fs-item dir';
+        up.innerHTML = '<i class="fas fa-folder"></i> ../';
+        up.onclick = () => { commands.cd(['..']); renderFSDir(); document.getElementById('fsPath').textContent = currentPath; };
+        list.appendChild(up);
+    }
+    Object.entries(children).forEach(([name, item]) => {
+        const el = document.createElement('div');
+        el.className = `fs-item ${item.type}`;
+        const icon = item.type === 'dir' ? 'fa-folder' : (item.type === 'exec' ? 'fa-cog' : 'fa-file-alt');
+        const suffix = item.type === 'dir' ? '/' : '';
+        el.innerHTML = `<i class="fas ${icon}"></i> ${name}${suffix}`;
+        el.onclick = () => {
+            if (item.type === 'dir') { commands.cd([name]); renderFSDir(); document.getElementById('fsPath').textContent = currentPath; }
+            else { alert(`📄 ${name}\n\n${item.content}`); }
+        };
+        list.appendChild(el);
+    });
+}
+
+// ===================== ADMIN =====================
+function openAdmin() { document.getElementById('adminModal').classList.add('open'); document.getElementById('adminUser').focus(); }
+function closeAdmin() { document.getElementById('adminModal').classList.remove('open'); }
+
+function doAdminLogin() {
+    const u = document.getElementById('adminUser').value;
+    const p = document.getElementById('adminPass').value;
+    const btn = document.getElementById('adminSubmit');
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> AUTHENTICATING...';
+    btn.disabled = true;
+    setTimeout(() => {
+        if (u === 'admin' && p === 'SecureAdmin2024!') {
+            closeAdmin();
+            renderAdminDashboard();
+        } else {
+            btn.innerHTML = '<i class="fas fa-times"></i> ACCESS DENIED';
+            btn.style.background = 'rgba(255,0,64,0.2)';
+            btn.style.borderColor = '#ff0040';
+            btn.style.color = '#ff0040';
+            setTimeout(() => {
+                btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> AUTHENTICATE';
+                btn.style.background = '';
+                btn.style.borderColor = '';
+                btn.style.color = '';
+                btn.disabled = false;
+            }, 2000);
+        }
+    }, 1800);
+}
+
+document.getElementById('adminPass').addEventListener('keydown', e => { if (e.key === 'Enter') doAdminLogin(); });
+
+function renderAdminDashboard() {
+    const panel = document.getElementById('mainPanel');
+    panel.innerHTML = `
+        <div style="padding:1.5rem;overflow-y:auto;height:100%">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
+                <div style="font-family:'Orbitron',sans-serif;font-size:1rem;letter-spacing:4px;color:var(--pink);text-shadow:var(--glow-p)"><i class="fas fa-user-shield"></i> ADMIN CONTROL PANEL</div>
+                <button onclick="location.reload()" style="font-family:'Orbitron',sans-serif;font-size:0.65rem;letter-spacing:2px;padding:0.5rem 1rem;background:transparent;border:1px solid var(--pink);color:var(--pink);cursor:pointer;">LOGOUT</button>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:2rem">
+                ${[
+                    ['👥','USER STATS','1,247 active / 45 new today','var(--cyan)'],
+                    ['🛡️','THREATS BLOCKED',threatCount + ' this session','var(--green)'],
+                    ['💾','STORAGE USED','67% / 2TB','var(--yellow)'],
+                    ['⚡','UPTIME','99.97% / 30 days','var(--pink)'],
+                ].map(([ico,title,val,c]) => `
+                    <div style="background:rgba(0,255,249,0.03);border:1px solid ${c}33;border-radius:4px;padding:1.2rem">
+                        <div style="font-size:1.8rem;margin-bottom:0.5rem">${ico}</div>
+                        <div style="font-family:'Orbitron',sans-serif;font-size:0.6rem;letter-spacing:2px;color:${c};margin-bottom:0.5rem">${title}</div>
+                        <div style="font-size:0.85rem;color:var(--text)">${val}</div>
+                    </div>`).join('')}
+            </div>
+            <div style="background:rgba(0,255,249,0.02);border:1px solid var(--border);border-radius:4px;padding:1.5rem">
+                <div style="font-family:'Orbitron',sans-serif;font-size:0.65rem;letter-spacing:3px;color:var(--cyan);margin-bottom:1rem"><i class="fas fa-terminal"></i> ADMIN TERMINAL</div>
+                <div style="display:flex;gap:0.8rem;margin-bottom:0.8rem">
+                    <input id="adminCmd" type="text" placeholder="Enter admin command (users / logs / system / backup)..." style="flex:1;padding:0.8rem;background:rgba(0,0,0,0.4);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:0.85rem;outline:none;">
+                    <button onclick="runAdminCmd()" style="font-family:'Orbitron',sans-serif;font-size:0.65rem;letter-spacing:2px;padding:0 1.2rem;background:rgba(0,255,249,0.1);border:1px solid var(--cyan);color:var(--cyan);cursor:pointer;">EXEC</button>
+                </div>
+                <div id="adminOut" style="background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:2px;padding:1rem;min-height:100px;max-height:250px;overflow-y:auto;font-size:0.8rem;line-height:1.8;"></div>
+            </div>
+        </div>`;
+    document.getElementById('adminCmd').addEventListener('keydown', e => { if (e.key === 'Enter') runAdminCmd(); });
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+}
+
+function runAdminCmd() {
+    const input = document.getElementById('adminCmd');
+    const out = document.getElementById('adminOut');
+    const cmd = input.value.trim().toLowerCase();
+    if (!cmd) return;
+    const ts = `[${new Date().toLocaleTimeString()}]`;
+    const responses = {
+        users: `Active: 1,247\nNew today: 45\nBanned: 12\nOnline now: ${Math.floor(Math.random()*200+50)}`,
+        logs: `${ts} System scan — CLEAN\n${ts} ${Math.floor(Math.random()*5+1)} threats blocked\n${ts} Backup — COMPLETE\n${ts} Auth event — root login`,
+        system: `OS: NEXUS OS 6.1.0\nUptime: 30 days\nLoad: ${(Math.random()+0.5).toFixed(2)}\nCPU: ${Math.floor(Math.random()*30+20)}%`,
+        backup: `Initiating backup...\n██████████████████ 100%\nBackup complete — 2.4GB encrypted\nStored: /vault/backup_${Date.now()}`,
+        clear: '',
+    };
+    const resp = responses[cmd] ?? `Unknown command: ${cmd}\nAvailable: users, logs, system, backup, clear`;
+    if (cmd === 'clear') { out.innerHTML = ''; } else {
+        const entry = document.createElement('div');
+        entry.innerHTML = `<span style="color:var(--pink)">${ts}</span> <span style="color:var(--yellow)">${cmd}</span>\n<span style="color:var(--text)">${resp}</span>\n`;
+        entry.style.borderBottom = '1px solid var(--border)';
+        entry.style.paddingBottom = '0.5rem';
+        entry.style.marginBottom = '0.5rem';
+        entry.style.whiteSpace = 'pre-wrap';
+        out.appendChild(entry);
+        out.scrollTop = out.scrollHeight;
+    }
+    input.value = '';
+}
+
+// ===================== MISC =====================
+function doLogout() {
+    if (confirm('Terminate session?')) { sessionStorage.clear(); window.location.href = 'index.html'; }
+}
+
+// Keep focus on terminal input
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.modal-overlay') && !e.target.closest('.hack-cell') && !e.target.closest('.port-card') && !e.target.closest('.music-btn') && !e.target.closest('.nav-btn') && !e.target.closest('.action-btn') && !e.target.closest('.playlist-item') && !e.target.closest('.tab') && !e.target.closest('input') && !e.target.closest('button')) {
+        const inp = document.getElementById('mainInput');
+        if (inp) inp.focus();
+    }
+});
+</script>
 </body>
 </html>
