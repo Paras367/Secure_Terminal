@@ -3,37 +3,383 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SECURE TERMINAL v2.0 | Restricted Access</title>
-    <link rel="stylesheet" href="css/style.css">
+    <title>NEXUS TERMINAL | Restricted Access</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=VT323&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --neon-cyan: #00fff9;
+            --neon-pink: #ff00a0;
+            --neon-green: #00ff41;
+            --neon-purple: #b700ff;
+            --neon-yellow: #ffe000;
+            --dark: #030712;
+            --darker: #010409;
+            --panel: rgba(0,255,249,0.04);
+            --border: rgba(0,255,249,0.2);
+            --glow-cyan: 0 0 20px rgba(0,255,249,0.5), 0 0 40px rgba(0,255,249,0.2);
+            --glow-pink: 0 0 20px rgba(255,0,160,0.5), 0 0 40px rgba(255,0,160,0.2);
+            --glow-green: 0 0 20px rgba(0,255,65,0.5);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background: var(--darker);
+            color: var(--neon-cyan);
+            min-height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+        /* Matrix Rain Canvas */
+        #matrixCanvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            opacity: 0.15;
+        }
+        /* Scanlines */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,255,249,0.015) 2px,
+                rgba(0,255,249,0.015) 4px
+            );
+            pointer-events: none;
+            z-index: 999;
+        }
+        /* Vignette */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.8) 100%);
+            pointer-events: none;
+            z-index: 998;
+        }
+
+        .gate-container {
+            position: relative;
+            z-index: 10;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .gate-box {
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+            animation: bootUp 1s ease-out;
+        }
+
+        @keyframes bootUp {
+            from { opacity: 0; transform: translateY(30px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .skull-icon {
+            font-size: 5rem;
+            color: var(--neon-pink);
+            text-shadow: var(--glow-pink);
+            animation: pulseGlow 2s ease-in-out infinite;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { text-shadow: 0 0 20px rgba(255,0,160,0.5), 0 0 40px rgba(255,0,160,0.2); }
+            50% { text-shadow: 0 0 40px rgba(255,0,160,0.9), 0 0 80px rgba(255,0,160,0.5), 0 0 120px rgba(255,0,160,0.3); }
+        }
+
+        .gate-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 900;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(90deg, var(--neon-cyan), var(--neon-pink), var(--neon-cyan));
+            background-size: 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shimmer 3s linear infinite;
+        }
+
+        @keyframes shimmer {
+            to { background-position: 200% center; }
+        }
+
+        .gate-subtitle {
+            font-family: 'VT323', monospace;
+            font-size: 1.2rem;
+            color: var(--neon-green);
+            letter-spacing: 4px;
+            margin-bottom: 2.5rem;
+            text-shadow: var(--glow-green);
+        }
+
+        .warning-panel {
+            background: rgba(255,0,160,0.05);
+            border: 1px solid rgba(255,0,160,0.4);
+            border-radius: 4px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .warning-panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--neon-pink), transparent);
+            animation: scanBeam 3s linear infinite;
+        }
+
+        @keyframes scanBeam {
+            to { left: 100%; }
+        }
+
+        .warning-panel p {
+            margin: 0.8rem 0;
+            color: #ccc;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .restricted-badge {
+            display: inline-block;
+            background: var(--neon-pink);
+            color: #000;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            font-size: 0.75rem;
+            padding: 0.4rem 1rem;
+            letter-spacing: 3px;
+            margin-bottom: 1rem;
+        }
+
+        .age-text {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--neon-pink);
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-shadow: var(--glow-pink);
+            margin-top: 1rem;
+        }
+
+        .gate-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        .gate-btn {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .gate-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 0; height: 0;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .gate-btn:hover::before { width: 300px; height: 300px; }
+
+        .btn-deny {
+            background: transparent;
+            color: var(--neon-pink);
+            border: 2px solid var(--neon-pink);
+            box-shadow: 0 0 15px rgba(255,0,160,0.3), inset 0 0 15px rgba(255,0,160,0.05);
+        }
+        .btn-deny:hover {
+            background: var(--neon-pink);
+            color: #000;
+            box-shadow: 0 0 30px rgba(255,0,160,0.7);
+        }
+
+        .btn-enter {
+            background: transparent;
+            color: var(--neon-cyan);
+            border: 2px solid var(--neon-cyan);
+            box-shadow: 0 0 15px rgba(0,255,249,0.3), inset 0 0 15px rgba(0,255,249,0.05);
+        }
+        .btn-enter:hover {
+            background: var(--neon-cyan);
+            color: #000;
+            box-shadow: 0 0 30px rgba(0,255,249,0.7);
+        }
+
+        .system-info-bar {
+            margin-top: 2.5rem;
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            font-size: 0.75rem;
+            color: rgba(0,255,249,0.5);
+        }
+
+        .sys-stat { display: flex; align-items: center; gap: 0.4rem; }
+        .sys-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--neon-green); animation: blink 1.5s ease-in-out infinite; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+        /* Glitch text effect */
+        .glitch {
+            position: relative;
+        }
+        .glitch::before, .glitch::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, var(--neon-cyan), var(--neon-pink), var(--neon-cyan));
+            background-size: 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .glitch::before {
+            animation: glitch1 4s infinite;
+            clip-path: polygon(0 20%, 100% 20%, 100% 40%, 0 40%);
+        }
+        .glitch::after {
+            animation: glitch2 4s infinite;
+            clip-path: polygon(0 60%, 100% 60%, 100% 80%, 0 80%);
+        }
+        @keyframes glitch1 {
+            0%,90%,100% { transform: translate(0); }
+            92% { transform: translate(-3px, 2px); }
+            94% { transform: translate(3px, -2px); }
+            96% { transform: translate(-2px, 0); }
+        }
+        @keyframes glitch2 {
+            0%,90%,100% { transform: translate(0); }
+            92% { transform: translate(3px, 2px); }
+            94% { transform: translate(-3px, -2px); }
+            96% { transform: translate(2px, 0); }
+        }
+    </style>
 </head>
-<body class="age-gate">
-    <div class="age-verification" id="ageGate">
-        <div class="warning-container">
-            <i class="fas fa-exclamation-triangle warning-icon"></i>
-            <h1>RESTRICTED ACCESS</h1>
-            <div class="warning-box">
-                <p><i class="fas fa-shield-alt"></i> SECURE TERMINAL SYSTEM</p>
-                <p>This system contains sensitive information and is restricted to authorized personnel only.</p>
-                <p class="age-restriction">YOU MUST BE 18+ TO ENTER</p>
+<body>
+    <canvas id="matrixCanvas"></canvas>
+    <div class="gate-container">
+        <div class="gate-box">
+            <i class="fas fa-skull skull-icon"></i>
+            <h1 class="gate-title glitch" data-text="NEXUS TERMINAL">NEXUS TERMINAL</h1>
+            <p class="gate-subtitle">[ CLASSIFIED SYSTEM // AUTHORIZED ACCESS ONLY ]</p>
+
+            <div class="warning-panel">
+                <div class="restricted-badge">⚠ TOP SECRET // RESTRICTED</div>
+                <p>This terminal grants access to classified systems and sensitive infrastructure. All activity is monitored and logged in real-time.</p>
+                <p>Unauthorized access attempts will be traced, reported, and prosecuted to the full extent of applicable law.</p>
+                <p class="age-text">ACCESS RESTRICTED: 18+ ONLY</p>
             </div>
-            <div class="buttons">
-                <button class="btn btn-danger" onclick="denyAccess()">
+
+            <div class="gate-buttons">
+                <button class="gate-btn btn-deny" onclick="denyAccess()">
                     <i class="fas fa-times"></i> DENY ACCESS
                 </button>
-                <button class="btn btn-success" onclick="verifyAge()">
-                    <i class="fas fa-check"></i> I AM 18+ & AGREE
+                <button class="gate-btn btn-enter" onclick="verifyAndEnter(this)">
+                    <i class="fas fa-fingerprint"></i> I AM 18+ — ENTER
                 </button>
             </div>
-            <div class="ads-banner top">
-                <div class="ad-placeholder">
-                    <span>ADVERTISEMENT</span>
-                    <small>CyberSecurity Solutions Inc.</small>
-                </div>
+
+            <div class="system-info-bar">
+                <span class="sys-stat"><span class="sys-dot"></span> ENCRYPTION: AES-256</span>
+                <span class="sys-stat"><span class="sys-dot"></span> TOR: ACTIVE</span>
+                <span class="sys-stat"><span class="sys-dot"></span> FIREWALL: ONLINE</span>
             </div>
         </div>
     </div>
 
-    <script src="js/main.js"></script>
+    <script>
+        // Matrix Rain
+        const canvas = document.getElementById('matrixCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        const chars = 'ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789ABCDEF'.split('');
+        const fontSize = 14;
+        const columns = Math.floor(canvas.width / fontSize);
+        const drops = Array(columns).fill(1);
+
+        function drawMatrix() {
+            ctx.fillStyle = 'rgba(1,4,9,0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#00fff9';
+            ctx.font = fontSize + 'px Share Tech Mono';
+            drops.forEach((y, i) => {
+                const char = chars[Math.floor(Math.random() * chars.length)];
+                ctx.fillStyle = Math.random() > 0.95 ? '#fff' : (Math.random() > 0.5 ? '#00fff9' : '#00ff41');
+                ctx.fillText(char, i * fontSize, y * fontSize);
+                if (y * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+                drops[i]++;
+            });
+        }
+        setInterval(drawMatrix, 50);
+        window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+
+        function verifyAndEnter(btn) {
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> SCANNING BIOMETRICS...';
+            btn.disabled = true;
+            setTimeout(() => {
+                btn.innerHTML = '<i class="fas fa-check"></i> ACCESS GRANTED';
+                btn.style.background = 'var(--neon-cyan)';
+                btn.style.color = '#000';
+                setTimeout(() => {
+                    sessionStorage.setItem('nexusVerified', 'true');
+                    sessionStorage.setItem('verifyTime', Date.now());
+                    window.location.href = 'terminal.html';
+                }, 800);
+            }, 2000);
+        }
+
+        function denyAccess() {
+            document.body.innerHTML = `
+                <canvas id="matrixCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;opacity:0.1;z-index:0"></canvas>
+                <div style="position:relative;z-index:10;min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;gap:2rem;padding:2rem;">
+                    <i class="fas fa-ban" style="font-size:6rem;color:#ff00a0;text-shadow:0 0 30px #ff00a0;"></i>
+                    <h1 style="font-family:Orbitron,sans-serif;font-size:2rem;color:#ff00a0;letter-spacing:5px;text-shadow:0 0 20px #ff00a0;">ACCESS DENIED</h1>
+                    <p style="color:#666;max-width:400px;">You have declined access. This session has been logged for security purposes.</p>
+                    <button onclick="location.reload()" style="font-family:Orbitron,sans-serif;font-size:0.8rem;padding:1rem 2rem;background:transparent;border:2px solid #00fff9;color:#00fff9;cursor:pointer;letter-spacing:2px;text-transform:uppercase;">↩ RETURN</button>
+                </div>`;
+        }
+
+        // Check if already verified
+        const v = sessionStorage.getItem('nexusVerified');
+        const vt = sessionStorage.getItem('verifyTime');
+        if (v === 'true' && vt && (Date.now() - vt) / 3600000 < 24) {
+            window.location.href = 'terminal.html';
+        }
+    </script>
 </body>
 </html>
